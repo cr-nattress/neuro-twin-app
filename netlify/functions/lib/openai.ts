@@ -53,34 +53,74 @@ function getOpenAIClient(): OpenAI {
 }
 
 /**
- * System prompt that instructs GPT on persona extraction task.
+ * Persona Extraction Prompt Template (Two-Part System)
  *
- * @decision Uses structured instructions with specific field definitions to ensure
- * consistent JSON output format across all requests
+ * This implements a strict two-part prompting strategy to maximize OpenAI output consistency:
+ *
+ * PART 1 - System Message: Defines the extraction task, field definitions, and output schema
+ * PART 2 - User Message: Wraps the textBlocks and links in a structured template
+ *
+ * Why two-part?
+ * - System prompt sets the behavioral constraints (JSON-only, strict schema, field rules)
+ * - User prompt provides the actual data to extract from
+ * - Together they reduce hallucination and enforce format compliance
+ *
+ * Key Constraints:
+ * - Explicit schema definition prevents hallucinated keys
+ * - "Return ONLY valid JSON" enforces no markdown/explanations
+ * - CRITICAL note prevents wrapping in success/persona keys (backend adds those)
+ * - Clear null vs [] rules: nullable fields get null, arrays get []
+ * - Field counts and types strictly specified
+ *
+ * Response Handling:
+ * - Backend expects: { name, age, occupation, background, traits, interests, ... }
+ * - Backend ADDS: metadata (created_at, source counts) and raw_data (original inputs)
+ * - System prompt explicitly says "The backend will handle metadata and raw_data"
+ *
+ * See extractPersona() for how the user message is constructed from textBlocks/links.
  */
 const PERSONA_SYSTEM_PROMPT = `You are an expert at analyzing text and links about a person to create a detailed digital persona.
 
-Your task is to:
-1. Extract key information about the person from the provided text blocks and links
-2. Structure the information into a standardized persona format
-3. Fill in the following fields based on available information:
-   - name: Full name if available
-   - age: Age or age range if mentioned
-   - occupation: Primary job or role
-   - background: Summary of relevant background
-   - traits: List of personality traits (5-7 key traits)
-   - interests: List of interests and hobbies (5-10 items)
-   - skills: Professional or technical skills (5-10 items)
-   - values: Core values and principles (3-5 items)
-   - communication_style: How they typically communicate
-   - personality_type: Any personality types if mentioned (MBTI, Big Five, etc.)
-   - goals: Current or future goals if mentioned
-   - challenges: Known challenges or concerns
-   - relationships: Key relationships or professional connections
+Your task:
+1) Extract key information from the provided text blocks and links.
+2) Structure the information into the exact JSON format specified below.
+3) Follow these field definitions:
+   - name: Full name if available, else null
+   - age: Age or age range as a number if mentioned, else null
+   - occupation: Primary job/role if available, else null
+   - background: Concise summary (string; may be empty)
+   - traits: 5–7 personality traits (array of strings)
+   - interests: 5–10 interests/hobbies (array of strings)
+   - skills: 5–10 professional/technical skills (array of strings)
+   - values: 3–5 core values (array of strings)
+   - communication_style: How they communicate if known, else null
+   - personality_type: If mentioned (MBTI, Big Five, etc.), else null
+   - goals: Current/future goals if mentioned (array of strings)
+   - challenges: Known challenges/concerns (array of strings)
+   - relationships: Key relationships/connections (array of strings)
 
-Return the response as valid JSON only, with no additional text or markdown.
+Output requirements:
+- Return ONLY valid JSON. No markdown, no explanations, no preamble.
+- If a field is unknown, use null (for nullable fields) or [] (for arrays).
+- Conform EXACTLY to this top-level shape (DO NOT wrap in "success" or "persona" keys):
 
-If information is not available for a field, use null or an empty array as appropriate.`;
+{
+  "name": string|null,
+  "age": number|null,
+  "occupation": string|null,
+  "background": string,
+  "traits": string[],
+  "interests": string[],
+  "skills": string[],
+  "values": string[],
+  "communication_style": string|null,
+  "personality_type": string|null,
+  "goals": string[],
+  "challenges": string[],
+  "relationships": string[]
+}
+
+CRITICAL: Return only the persona object above. The backend will handle metadata and raw_data.`;
 
 /**
  * Input payload for persona extraction.
@@ -140,12 +180,18 @@ export interface PersonaExtractionResult {
 export async function extractPersona(input: PersonaExtractionInput): Promise<PersonaExtractionResult> {
   const client = getOpenAIClient();
 
-  // Prepare the user message
-  const userMessage = `${
+  // Prepare the user message using structured template
+  const textBlocksSection =
     input.textBlocks.length > 0
       ? `Text blocks about the person:\n${input.textBlocks.map((b, i) => `${i + 1}. ${b}`).join("\n\n")}\n\n`
-      : ""
-  }${input.links.length > 0 ? `Links provided:\n${input.links.join("\n")}` : ""}`;
+      : "";
+
+  const linksSection =
+    input.links.length > 0
+      ? `Links provided:\n${input.links.join("\n")}`
+      : "";
+
+  const userMessage = (textBlocksSection + linksSection).trim() || "No information provided.";
 
   logger.info("OpenAI persona extraction started", {
     textBlockCount: input.textBlocks.length,
@@ -174,17 +220,20 @@ export async function extractPersona(input: PersonaExtractionInput): Promise<Per
       throw new OpenAIError("No response content from OpenAI");
     }
 
-    // Parse JSON response
+    // Parse JSON response (system prompt enforces strict JSON-only output)
     let result: PersonaExtractionResult;
     try {
-      // Try to extract JSON from the response (in case there's extra text)
+      // Extract JSON from response (robust parsing in case of extra whitespace)
+      // System prompt requires "Return ONLY valid JSON" so this should be a clean object
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error("No JSON found in response");
       }
       result = JSON.parse(jsonMatch[0]);
     } catch (parseError) {
-      logger.error("Failed to parse OpenAI response as JSON", parseError, { content });
+      logger.error("Failed to parse OpenAI response as JSON", parseError, {
+        responsePreview: content.substring(0, 500),
+      });
       throw new OpenAIError("Failed to parse persona data from OpenAI response");
     }
 
