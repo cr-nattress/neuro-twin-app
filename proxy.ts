@@ -20,7 +20,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * - Redirects unauthenticated users to login
  * - Redirects authenticated users away from login page
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: request.headers,
