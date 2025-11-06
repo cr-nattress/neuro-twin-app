@@ -56,6 +56,24 @@ export function errorResponse(error: AppError) {
 }
 
 /**
+ * Convert Response to Netlify HandlerResponse format
+ */
+async function responseToHandlerResponse(response: Response) {
+  const body = await response.text();
+  const headers: Record<string, string> = {};
+
+  response.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+
+  return {
+    statusCode: response.status,
+    body,
+    headers,
+  };
+}
+
+/**
  * Base handler wrapper
  * Catches errors, handles CORS, logs requests
  */
@@ -78,7 +96,8 @@ export function createHandler(
     try {
       // Handle CORS preflight
       if (request.method === "OPTIONS") {
-        return handleOptions();
+        const response = handleOptions();
+        return responseToHandlerResponse(response);
       }
 
       // Call handler function
@@ -92,7 +111,7 @@ export function createHandler(
         duration: `${duration}ms`,
       });
 
-      return response;
+      return responseToHandlerResponse(response);
     } catch (error: unknown) {
       // Convert to AppError
       const appError = toAppError(error);
@@ -106,7 +125,8 @@ export function createHandler(
       });
 
       // Return error response
-      return errorResponse(appError);
+      const response = errorResponse(appError);
+      return responseToHandlerResponse(response);
     }
   };
 }
