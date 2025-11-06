@@ -48,15 +48,13 @@ import {
   getQueryParams,
 } from "./lib/base-handler";
 import { listPersonasFromStorage } from "./lib/supabase";
-import { validateInput, PaginationSchema } from "./lib/validation";
+import {
+  validateInput,
+  PaginationSchema,
+  ListPersonasResponseSchema,
+  ListPersonasResponse,
+} from "./lib/validation";
 import { logger } from "./lib/logger";
-
-interface ListPersonasResponse {
-  success: boolean;
-  personas?: Array<{ id: string; name: string; created_at: string }>;
-  total?: number;
-  error?: string;
-}
 
 /**
  * Handles persona list requests with pagination.
@@ -91,7 +89,11 @@ async function handleListPersonas(request: Request): Promise<Response> {
     total: result.total,
   };
 
-  return jsonResponse(response, 200);
+  // Validate response matches schema
+  const validatedResponse = ListPersonasResponseSchema.parse(response);
+  logger.debug("Response validated against ListPersonasResponseSchema");
+
+  return jsonResponse(validatedResponse, 200);
 }
 
 /**

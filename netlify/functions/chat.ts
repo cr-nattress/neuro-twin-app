@@ -58,23 +58,15 @@ import {
   parseJsonBody,
   jsonResponse,
 } from "./lib/base-handler";
-import { validateInput, ChatMessageSchema } from "./lib/validation";
+import {
+  validateInput,
+  ChatMessageSchema,
+  ChatResponseSchema,
+  ChatResponse,
+} from "./lib/validation";
 import { getPersonaFromStorage } from "./lib/supabase";
 import { logger } from "./lib/logger";
 import { nanoid } from "nanoid";
-
-interface ChatResponse {
-  success: boolean;
-  response?: string;
-  conversation_id?: string;
-  message_id?: string;
-  error?: string;
-  metadata?: {
-    tokens_used: number;
-    processing_time_ms: number;
-    agents_involved?: string[];
-  };
-}
 
 /**
  * Generates mock response based on message content and persona context.
@@ -195,7 +187,11 @@ async function handleChat(request: Request): Promise<Response> {
     },
   };
 
-  return jsonResponse(chatResponse, 200);
+  // Validate response matches schema
+  const validatedResponse = ChatResponseSchema.parse(chatResponse);
+  logger.debug("Response validated against ChatResponseSchema");
+
+  return jsonResponse(validatedResponse, 200);
 }
 
 /**

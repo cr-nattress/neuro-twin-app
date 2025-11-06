@@ -50,22 +50,13 @@ import {
   jsonResponse,
 } from "./lib/base-handler";
 import { extractPersona, validatePersonaStructure } from "./lib/openai";
-import { validateInput, PersonaInputSchema } from "./lib/validation";
+import {
+  validateInput,
+  PersonaInputSchema,
+  ProcessPersonaResponseSchema,
+  ProcessPersonaResponse,
+} from "./lib/validation";
 import { logger } from "./lib/logger";
-
-/**
- * Response format for process-persona endpoint.
- *
- * @interface ProcessPersonaResponse
- * @property {boolean} success - Whether processing succeeded
- * @property {any} [persona] - Structured persona object (if success=true)
- * @property {string} [error] - Error message (if success=false)
- */
-interface ProcessPersonaResponse {
-  success: boolean;
-  persona?: any;
-  error?: string;
-}
 
 /**
  * Handles persona processing requests.
@@ -141,7 +132,11 @@ async function handleProcessPersona(request: Request): Promise<Response> {
     persona,
   };
 
-  return jsonResponse(response, 200);
+  // Validate response matches schema
+  const validatedResponse = ProcessPersonaResponseSchema.parse(response);
+  logger.debug("Response validated against ProcessPersonaResponseSchema");
+
+  return jsonResponse(validatedResponse, 200);
 }
 
 /**

@@ -50,15 +50,13 @@ import {
   jsonResponse,
 } from "./lib/base-handler";
 import { generatePersonaId, savePersonaToStorage } from "./lib/supabase";
-import { validateInput, SavePersonaPayloadSchema } from "./lib/validation";
+import {
+  validateInput,
+  SavePersonaPayloadSchema,
+  SavePersonaResponseSchema,
+  SavePersonaResponse,
+} from "./lib/validation";
 import { logger } from "./lib/logger";
-
-interface SavePersonaResponse {
-  success: boolean;
-  persona_id?: string;
-  storage_path?: string;
-  error?: string;
-}
 
 /**
  * Handles persona save requests.
@@ -106,7 +104,11 @@ async function handleSavePersona(request: Request): Promise<Response> {
     storage_path: storagePath,
   };
 
-  return jsonResponse(response, 200);
+  // Validate response matches schema
+  const validatedResponse = SavePersonaResponseSchema.parse(response);
+  logger.debug("Response validated against SavePersonaResponseSchema");
+
+  return jsonResponse(validatedResponse, 200);
 }
 
 /**

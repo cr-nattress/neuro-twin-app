@@ -55,15 +55,14 @@ import {
   getQueryParam,
 } from "./lib/base-handler";
 import { getPersonaFromStorage } from "./lib/supabase";
-import { validatePersonaId } from "./lib/validation";
+import {
+  validateInput,
+  GetPersonaQuerySchema,
+  GetPersonaResponseSchema,
+  GetPersonaResponse,
+} from "./lib/validation";
 import { logger } from "./lib/logger";
 import { NotFoundError, ValidationError } from "./lib/errors";
-
-interface GetPersonaResponse {
-  success: boolean;
-  persona?: any;
-  error?: string;
-}
 
 /**
  * Handles persona retrieval requests.
@@ -77,26 +76,21 @@ interface GetPersonaResponse {
 async function handleGetPersona(request: Request): Promise<Response> {
   logger.info("get-persona function called");
 
-  // Get persona ID from query params
+  // Get persona ID from query params and validate
   const personaId = getQueryParam(request, "persona_id");
-  if (!personaId) {
-    logger.error("Persona ID not provided");
-    throw new ValidationError("Persona ID is required (query parameter: persona_id)");
-  }
+  const queryParams = { persona_id: personaId };
 
-  // Validate persona ID format
-  if (!validatePersonaId(personaId)) {
-    logger.error("Invalid persona ID format", { personaId });
-    throw new ValidationError(`Invalid persona ID format: ${personaId}`);
-  }
+  // Validate query parameters using schema
+  const validatedQuery = validateInput(GetPersonaQuerySchema, queryParams);
+  logger.debug("Query parameters validated against GetPersonaQuerySchema");
 
-  logger.info("Retrieving persona from storage", { personaId });
+  logger.info("Retrieving persona from storage", { personaId: validatedQuery.persona_id });
 
   // Retrieve from Supabase
-  const persona = await getPersonaFromStorage(personaId);
+  const persona = await getPersonaFromStorage(validatedQuery.persona_id);
 
   logger.info("Persona retrieved successfully", {
-    personaId,
+    personaId: validatedQuery.persona_id,
     name: persona.name,
   });
 
@@ -105,7 +99,11 @@ async function handleGetPersona(request: Request): Promise<Response> {
     persona,
   };
 
-  return jsonResponse(response, 200);
+  // Validate response matches schema
+  const validatedResponse = GetPersonaResponseSchema.parse(response);
+  logger.debug("Response validated against GetPersonaResponseSchema");
+
+  return jsonResponse(validatedResponse, 200);
 }
 
 /**
