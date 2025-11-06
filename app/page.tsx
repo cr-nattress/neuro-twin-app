@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Sparkles, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { createClient } from "@/lib/supabase/client";
 
 type ViewMode = "form" | "review";
 
@@ -27,7 +26,6 @@ export default function Home() {
   const [persona, setPersona] = useState<Persona | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isHandlingCallback, setIsHandlingCallback] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,11 +152,15 @@ export default function Home() {
     }
   };
 
-  // Handle OAuth/OTP callback with code parameter
-  // Supabase sends the code to the root path instead of /auth/callback
+  /**
+   * Handle authentication errors passed in URL query parameters.
+   *
+   * The /auth/callback route handles magic link verification via exchangeCodeForSession.
+   * If there's an error, it redirects here with error parameters.
+   * This effect displays the error and clears the URL.
+   */
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      const code = searchParams.get("code");
+    const handleAuthError = () => {
       const error = searchParams.get("error");
 
       if (error) {
@@ -170,56 +172,11 @@ export default function Home() {
         });
         // Clear the URL after showing error
         window.history.replaceState({}, document.title, "/");
-        return;
-      }
-
-      if (code && !isHandlingCallback) {
-        setIsHandlingCallback(true);
-        try {
-          const supabase = createClient();
-
-          // For OTP (magic link) flow, we need to verify the token
-          // The code parameter is the OTP token that was sent via email
-          const { data, error: verifyError } = await supabase.auth.verifyOtp({
-            token: code,
-            type: "magiclink",
-          });
-
-          if (verifyError) {
-            console.error("OTP verification error:", verifyError);
-            toast({
-              title: "Authentication Error",
-              description: verifyError.message || "Failed to authenticate",
-              variant: "destructive",
-            });
-            // Clear the URL after showing error
-            window.history.replaceState({}, document.title, "/");
-          } else {
-            // OTP verification successful - the user is now authenticated
-            // The useAuth hook will detect the new session and update
-            // Clear the URL
-            window.history.replaceState({}, document.title, "/");
-            toast({
-              title: "Signed In",
-              description: "Successfully authenticated with magic link",
-            });
-          }
-        } catch (error) {
-          console.error("Unexpected auth error:", error);
-          toast({
-            title: "Error",
-            description: "An unexpected error occurred during authentication",
-            variant: "destructive",
-          });
-          window.history.replaceState({}, document.title, "/");
-        } finally {
-          setIsHandlingCallback(false);
-        }
       }
     };
 
-    handleAuthCallback();
-  }, [searchParams, isHandlingCallback, router, toast]);
+    handleAuthError();
+  }, [searchParams, toast]);
 
   // Check authentication and redirect if needed
   useEffect(() => {
@@ -228,15 +185,13 @@ export default function Home() {
     }
   }, [user, isLoading, router]);
 
-  // Show loading state while checking authentication or processing callback
-  if (isLoading || isHandlingCallback) {
+  // Show loading state while checking authentication
+  if (isLoading) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">
-            {isHandlingCallback ? "Authenticating..." : "Loading..."}
-          </p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </main>
     );
