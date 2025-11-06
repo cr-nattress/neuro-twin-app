@@ -6,12 +6,8 @@
   publish = ".next"
 
 [functions]
-  # Node.js runtime version
   node_bundler = "esbuild"
-
-  # Function configuration
-  [[functions]]
-    node_version = "18.x"
+  node_version = "18.x"
 
 # Development configuration
 [dev]
