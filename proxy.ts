@@ -2,12 +2,23 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Middleware for authentication and route protection
- * Runs on every request to check auth status and redirect as needed
+ * @module proxy
  *
+ * Route proxy handler for authentication and route protection (Next.js 15+ convention).
+ *
+ * Previously named `middleware.ts`, renamed to `proxy.ts` to use the modern Next.js approach.
+ * Runs on every request to check auth status and redirect as needed.
+ *
+ * Features:
  * - Refreshes session on each request
  * - Protects /dashboard routes (redirects to /auth/login if not authenticated)
  * - Redirects authenticated users away from /auth/login
+ *
+ * @sideeffects
+ * - Validates Supabase auth tokens on every request
+ * - Updates auth cookies automatically
+ * - Redirects unauthenticated users to login
+ * - Redirects authenticated users away from login page
  */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -56,8 +67,16 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-// Configure which routes the middleware applies to
-// Matches all routes except static assets
+/**
+ * Route matcher configuration for proxy handler.
+ *
+ * Applies to all routes except:
+ * - Next.js static files (_next/static)
+ * - Optimized images (_next/image)
+ * - Favicon requests
+ *
+ * This ensures auth checks run on all user-facing routes and API calls.
+ */
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico).*)",
