@@ -21,10 +21,16 @@ export const apiAuthService: IAuthService = {
     try {
       const supabase = createBrowserClient();
 
+      // Get redirect URL - use Netlify URL in production, otherwise use current origin
+      const redirectUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/auth/callback`
+          : "https://neuro-twin-app.netlify.app/auth/callback";
+
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: redirectUrl,
         },
       });
 
