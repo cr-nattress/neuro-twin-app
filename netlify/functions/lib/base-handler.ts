@@ -22,7 +22,16 @@ function eventToRequest(event: HandlerEvent): Request {
   const queryString = event.rawQuery ? `?${event.rawQuery}` : "";
   const url = new URL(`https://example.com${path}${queryString}`);
 
-  const headers = new Headers(event.headers || {});
+  const headerObject: Record<string, string> = {};
+  if (event.headers) {
+    for (const [key, value] of Object.entries(event.headers)) {
+      if (typeof value === "string") {
+        headerObject[key] = value;
+      }
+    }
+  }
+
+  const headers = new Headers(headerObject);
 
   return new Request(url.toString(), {
     method,
