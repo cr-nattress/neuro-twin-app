@@ -21,6 +21,13 @@ interface PersonaReviewProps {
   isSaving: boolean;
 }
 
+/**
+ * Helper to safely filter and render array items, excluding null/undefined values
+ */
+function filterNullItems<T>(items: (T | null | undefined)[]): T[] {
+  return items.filter((item): item is T => item != null && item !== "");
+}
+
 export function PersonaReview({
   persona,
   onSave,
@@ -33,7 +40,10 @@ export function PersonaReview({
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `persona-${persona.name.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.json`;
+    const safeFileName = persona.name
+      ? persona.name.toLowerCase().replace(/\s+/g, "-")
+      : "persona";
+    link.download = `persona-${safeFileName}-${Date.now()}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -77,11 +87,17 @@ export function PersonaReview({
       {/* Main Persona Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-3xl">{persona.name}</CardTitle>
+          <CardTitle className="text-3xl">
+            {persona.name ? persona.name : "Unnamed Persona"}
+          </CardTitle>
           <CardDescription>
-            {persona.age && `${persona.age} years old`}
-            {persona.age && persona.occupation && " • "}
-            {persona.occupation}
+            {typeof persona.age === "number" && persona.age > 0 && (
+              <>
+                {persona.age} years old
+                {persona.occupation ? " • " : ""}
+              </>
+            )}
+            {persona.occupation && persona.occupation}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -96,11 +112,11 @@ export function PersonaReview({
           )}
 
           {/* Traits */}
-          {Array.isArray(persona.traits) && persona.traits.length > 0 && (
+          {Array.isArray(persona.traits) && filterNullItems(persona.traits).length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Personality Traits</h3>
               <div className="flex flex-wrap gap-2">
-                {persona.traits.map((trait, index) => (
+                {filterNullItems(persona.traits).map((trait, index) => (
                   <Badge key={index} variant="secondary">
                     {trait}
                   </Badge>
@@ -110,11 +126,11 @@ export function PersonaReview({
           )}
 
           {/* Interests */}
-          {Array.isArray(persona.interests) && persona.interests.length > 0 && (
+          {Array.isArray(persona.interests) && filterNullItems(persona.interests).length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Interests</h3>
               <div className="flex flex-wrap gap-2">
-                {persona.interests.map((interest, index) => (
+                {filterNullItems(persona.interests).map((interest, index) => (
                   <Badge key={index} variant="outline">
                     {interest}
                   </Badge>
@@ -124,11 +140,11 @@ export function PersonaReview({
           )}
 
           {/* Skills */}
-          {Array.isArray(persona.skills) && persona.skills.length > 0 && (
+          {Array.isArray(persona.skills) && filterNullItems(persona.skills).length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Skills</h3>
               <div className="flex flex-wrap gap-2">
-                {persona.skills.map((skill, index) => (
+                {filterNullItems(persona.skills).map((skill, index) => (
                   <Badge key={index}>{skill}</Badge>
                 ))}
               </div>
@@ -136,11 +152,11 @@ export function PersonaReview({
           )}
 
           {/* Values */}
-          {Array.isArray(persona.values) && persona.values.length > 0 && (
+          {Array.isArray(persona.values) && filterNullItems(persona.values).length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Core Values</h3>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                {persona.values.map((value, index) => (
+                {filterNullItems(persona.values).map((value, index) => (
                   <li key={index}>{value}</li>
                 ))}
               </ul>
@@ -168,11 +184,11 @@ export function PersonaReview({
           )}
 
           {/* Goals */}
-          {Array.isArray(persona.goals) && persona.goals.length > 0 && (
+          {Array.isArray(persona.goals) && filterNullItems(persona.goals).length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Goals</h3>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                {persona.goals.map((goal, index) => (
+                {filterNullItems(persona.goals).map((goal, index) => (
                   <li key={index}>{goal}</li>
                 ))}
               </ul>
@@ -180,11 +196,11 @@ export function PersonaReview({
           )}
 
           {/* Challenges */}
-          {Array.isArray(persona.challenges) && persona.challenges.length > 0 && (
+          {Array.isArray(persona.challenges) && filterNullItems(persona.challenges).length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Challenges</h3>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                {persona.challenges.map((challenge, index) => (
+                {filterNullItems(persona.challenges).map((challenge, index) => (
                   <li key={index}>{challenge}</li>
                 ))}
               </ul>
@@ -192,19 +208,25 @@ export function PersonaReview({
           )}
 
           {/* Metadata */}
-          <div className="pt-4 border-t">
-            <h3 className="text-sm font-semibold mb-2">Source Data</h3>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>
-                {persona.metadata.source_text_blocks} text block
-                {persona.metadata.source_text_blocks !== 1 ? "s" : ""}
-              </p>
-              <p>
-                {persona.metadata.source_links} link
-                {persona.metadata.source_links !== 1 ? "s" : ""}
-              </p>
+          {persona.metadata && (
+            <div className="pt-4 border-t">
+              <h3 className="text-sm font-semibold mb-2">Source Data</h3>
+              <div className="text-sm text-muted-foreground space-y-1">
+                {typeof persona.metadata.source_text_blocks === "number" && (
+                  <p>
+                    {persona.metadata.source_text_blocks} text block
+                    {persona.metadata.source_text_blocks !== 1 ? "s" : ""}
+                  </p>
+                )}
+                {typeof persona.metadata.source_links === "number" && (
+                  <p>
+                    {persona.metadata.source_links} link
+                    {persona.metadata.source_links !== 1 ? "s" : ""}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
