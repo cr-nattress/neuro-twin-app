@@ -1,3 +1,30 @@
+/**
+ * @module hooks/useAuth
+ *
+ * React hook for managing authentication state across the application.
+ *
+ * @context
+ * - Used by layout.tsx and auth-protected pages
+ * - Subscribes to Supabase auth state changes
+ * - Provides current user, session, loading state, and signOut function
+ *
+ * @dependencies
+ * - react (useEffect, useState, useCallback)
+ * - @/services/serviceFactory (authService): Auth service abstraction
+ * - @/types/auth: Auth type definitions
+ *
+ * @exports useAuth: Hook that returns { user, session, isLoading, error, signOut }
+ *
+ * @example
+ * ```typescript
+ * const { user, session, isLoading, error, signOut } = useAuth();
+ *
+ * if (isLoading) return <LoadingSpinner />;
+ * if (!user) return <LoginPrompt />;
+ * return <Dashboard user={user} onSignOut={signOut} />;
+ * ```
+ */
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -5,12 +32,18 @@ import { authService } from "@/services/serviceFactory";
 import type { User, Session, AuthState } from "@/types/auth";
 
 /**
- * useAuth Hook
- * Manages authentication state throughout the application
- * Provides user, session, loading, error state and signOut function
+ * React hook for authentication state management.
  *
- * Usage:
- * const { user, session, isLoading, error, signOut } = useAuth();
+ * @returns {object} Auth state and methods
+ * @returns {User | null} user - Current authenticated user or null
+ * @returns {Session | null} session - Current session with tokens or null
+ * @returns {boolean} isLoading - True while fetching initial auth state
+ * @returns {string | null} error - Error message if auth operations fail
+ * @returns {Function} signOut - Async function to sign out current user
+ *
+ * @sideeffects
+ * - Subscribes to auth state changes (cleanup on unmount)
+ * - Fetches user and session on mount
  */
 export function useAuth() {
   const [state, setState] = useState<AuthState>({

@@ -1,6 +1,29 @@
 /**
- * OpenAI Client Wrapper
- * Handles API calls to OpenAI with error handling and retry logic
+ * @module netlify/functions/lib/openai
+ *
+ * OpenAI GPT client for persona extraction from text and links.
+ *
+ * @context
+ * - Used by process-persona function to analyze user input and generate structured personas
+ * - Wraps OpenAI SDK with error handling specific to persona extraction use case
+ * - Uses gpt-3.5-turbo with low temperature (0.3) for consistent, factual extraction
+ *
+ * @dependencies
+ * - openai (OpenAI): Official OpenAI SDK
+ * - ./env (getEnv): Environment configuration
+ * - ./errors (OpenAIError): Custom error class for OpenAI failures
+ * - ./logger (logger): Structured logging
+ *
+ * @exports
+ * - PersonaExtractionInput: Input type (textBlocks, links)
+ * - PersonaExtractionResult: Structured persona output from GPT
+ * - extractPersona: Main function to extract persona from text/links
+ * - validatePersonaStructure: Validates GPT output structure
+ *
+ * @pattern Singleton - Single shared OpenAI client instance
+ * @sideeffects
+ * - Network requests to OpenAI API (costs money per token)
+ * - Logs all extraction requests and responses
  */
 
 import { OpenAI } from "openai";
@@ -8,10 +31,16 @@ import { getEnv } from "./env";
 import { OpenAIError } from "./errors";
 import { logger } from "./logger";
 
+/**
+ * Singleton OpenAI client instance (lazy-initialized).
+ */
 let openaiClient: OpenAI | null = null;
 
 /**
- * Get or create OpenAI client
+ * Gets or creates the OpenAI client instance.
+ *
+ * @returns {OpenAI} Configured OpenAI client
+ * @sideeffects Creates OpenAI client on first call (reads OPENAI_API_KEY from env)
  */
 function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
@@ -24,7 +53,10 @@ function getOpenAIClient(): OpenAI {
 }
 
 /**
- * System prompt for persona extraction
+ * System prompt that instructs GPT on persona extraction task.
+ *
+ * @decision Uses structured instructions with specific field definitions to ensure
+ * consistent JSON output format across all requests
  */
 const PERSONA_SYSTEM_PROMPT = `You are an expert at analyzing text and links about a person to create a detailed digital persona.
 
@@ -50,11 +82,23 @@ Return the response as valid JSON only, with no additional text or markdown.
 
 If information is not available for a field, use null or an empty array as appropriate.`;
 
+/**
+ * Input payload for persona extraction.
+ *
+ * @interface PersonaExtractionInput
+ * @property {string[]} textBlocks - Array of text blocks about the person
+ * @property {string[]} links - Array of URLs to analyze (LinkedIn, Twitter, etc.)
+ */
 export interface PersonaExtractionInput {
   textBlocks: string[];
   links: string[];
 }
 
+/**
+ * Structured persona result from GPT extraction.
+ *
+ * @interface PersonaExtractionResult
+ */
 export interface PersonaExtractionResult {
   name: string | null;
   age: number | null;
@@ -72,7 +116,26 @@ export interface PersonaExtractionResult {
 }
 
 /**
- * Extract persona from text blocks and links using OpenAI
+ * Extracts a structured persona from text blocks and links using GPT-3.5.
+ *
+ * @param {PersonaExtractionInput} input - Text blocks and links to analyze
+ * @returns {Promise<PersonaExtractionResult>} Structured persona data
+ * @throws {OpenAIError} If API call fails or response is invalid
+ *
+ * @sideeffects
+ * - Makes network request to OpenAI API (costs tokens)
+ * - Logs extraction start and completion
+ *
+ * @decision Uses temperature=0.3 for consistency while allowing some creativity.
+ * Max tokens=2000 is sufficient for persona structure without excessive cost.
+ *
+ * @example
+ * ```typescript
+ * const persona = await extractPersona({
+ *   textBlocks: ["John is a software engineer..."],
+ *   links: ["https://linkedin.com/in/johndoe"]
+ * });
+ * ```
  */
 export async function extractPersona(input: PersonaExtractionInput): Promise<PersonaExtractionResult> {
   const client = getOpenAIClient();
@@ -155,7 +218,13 @@ export async function extractPersona(input: PersonaExtractionInput): Promise<Per
 }
 
 /**
- * Validate persona structure
+ * Validates that the persona structure has minimum required fields.
+ *
+ * @param {PersonaExtractionResult} persona - Persona to validate
+ * @returns {boolean} True if persona has name or background and all required arrays
+ *
+ * @decision Requires at minimum name OR background to be useful. All array fields
+ * must be present (even if empty) for consistent iteration in UI.
  */
 export function validatePersonaStructure(persona: PersonaExtractionResult): boolean {
   // At minimum, we need either a name or background

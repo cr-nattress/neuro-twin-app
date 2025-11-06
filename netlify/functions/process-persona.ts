@@ -1,20 +1,46 @@
 /**
- * Process Persona Function
- * Processes raw text blocks and links into a structured persona using OpenAI
+ * @module netlify/functions/process-persona
  *
- * POST /.netlify/functions/process-persona
+ * Netlify Function endpoint that processes raw text/links into structured persona using OpenAI.
  *
- * Request body:
+ * @context
+ * - Called by frontend after user inputs text blocks and links
+ * - Validates input, calls OpenAI GPT-3.5, adds metadata, returns structured persona
+ * - Does not persist persona (that's save-persona's job)
+ *
+ * @endpoint POST /.netlify/functions/process-persona
+ *
+ * @dependencies
+ * - ./lib/base-handler: Request/response utilities
+ * - ./lib/openai: GPT persona extraction
+ * - ./lib/validation: Input validation schemas
+ * - ./lib/logger: Structured logging
+ *
+ * @sideeffects
+ * - Makes OpenAI API call (costs tokens)
+ * - Logs processing steps
+ *
+ * @example Request
+ * ```json
  * {
- *   "textBlocks": ["text 1", "text 2"],
- *   "links": ["https://...", "https://..."]
+ *   "textBlocks": ["John is a software engineer with 10 years experience..."],
+ *   "links": ["https://linkedin.com/in/johndoe"]
  * }
+ * ```
  *
- * Response:
+ * @example Response (success)
+ * ```json
  * {
  *   "success": true,
- *   "persona": { ...structured persona object... }
+ *   "persona": {
+ *     "name": "John Doe",
+ *     "occupation": "Software Engineer",
+ *     "traits": ["analytical", "detail-oriented"],
+ *     "metadata": { "created_at": "2024-01-01T00:00:00Z" },
+ *     "raw_data": { "textBlocks": [...], "links": [...] }
+ *   }
  * }
+ * ```
  */
 
 import { Handler } from "@netlify/functions";
@@ -27,6 +53,14 @@ import { extractPersona, validatePersonaStructure } from "./lib/openai";
 import { validateInput, PersonaInputSchema } from "./lib/validation";
 import { logger } from "./lib/logger";
 
+/**
+ * Response format for process-persona endpoint.
+ *
+ * @interface ProcessPersonaResponse
+ * @property {boolean} success - Whether processing succeeded
+ * @property {any} [persona] - Structured persona object (if success=true)
+ * @property {string} [error] - Error message (if success=false)
+ */
 interface ProcessPersonaResponse {
   success: boolean;
   persona?: any;
@@ -34,7 +68,12 @@ interface ProcessPersonaResponse {
 }
 
 /**
- * Handle process-persona requests
+ * Handles persona processing requests.
+ *
+ * @param {Request} request - Web API Request object
+ * @returns {Promise<Response>} JSON response with structured persona or error
+ * @throws {ValidationError} If input validation fails (caught by createHandler)
+ * @throws {OpenAIError} If GPT extraction fails (caught by createHandler)
  */
 async function handleProcessPersona(request: Request): Promise<Response> {
   logger.info("process-persona function called");

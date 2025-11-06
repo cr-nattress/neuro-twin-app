@@ -1,12 +1,42 @@
 /**
- * useChat Hook
- * Manage chat messages and conversation state
+ * @module hooks/useChat
+ *
+ * React hook for managing chat conversation with a persona.
+ *
+ * @context
+ * - Used by chat page to interact with persona via chat function
+ * - Maintains local message history and typing indicator
+ * - Sends last 10 messages as context to maintain conversation continuity
+ *
+ * @dependencies
+ * - react (useState, useCallback)
+ * - @/types/persona: Chat types (ChatMessage, ChatRequest, ChatResponse)
+ * - @/lib/api (getApiBaseUrl): API URL configuration
+ *
+ * @exports useChat: Hook that takes personaId and returns chat state/methods
+ *
+ * @example
+ * ```typescript
+ * const { messages, isTyping, sendMessage, clearConversation } = useChat(personaId);
+ *
+ * await sendMessage("Hello, tell me about yourself");
+ * ```
  */
 
 import { useState, useCallback } from "react";
 import { ChatMessage, ChatRequest, ChatResponse } from "@/types/persona";
 import { getApiBaseUrl } from "@/lib/api";
 
+/**
+ * Return type for useChat hook.
+ *
+ * @interface UseChatReturn
+ * @property {ChatMessage[]} messages - Array of user and agent messages
+ * @property {boolean} isTyping - True while waiting for agent response
+ * @property {Function} sendMessage - Async function to send a message
+ * @property {Function} clearConversation - Resets all messages and conversation ID
+ * @property {Function} exportConversation - Downloads conversation as JSON file
+ */
 interface UseChatReturn {
   messages: ChatMessage[];
   isTyping: boolean;
@@ -15,6 +45,19 @@ interface UseChatReturn {
   exportConversation: () => void;
 }
 
+/**
+ * React hook for chat conversation management.
+ *
+ * @param {string | null} personaId - ID of persona to chat with
+ * @returns {UseChatReturn} Chat state and methods
+ *
+ * @sideeffects
+ * - Makes network requests to chat function
+ * - Downloads JSON file when exportConversation is called
+ *
+ * @decision Sends last 10 messages as context to balance API cost vs. conversation
+ * quality. More context = higher token cost but better continuity.
+ */
 export function useChat(personaId: string | null): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState<boolean>(false);
