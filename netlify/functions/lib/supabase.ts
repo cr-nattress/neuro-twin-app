@@ -111,9 +111,13 @@ export async function savePersonaToStorage(
   logger.info("Saving persona to Supabase", { personaId, size: personaJson.length });
 
   try {
+    // Convert JSON string to Blob for proper upload handling
+    // Supabase storage.upload() works better with Blob objects than plain strings
+    const blob = new Blob([personaJson], { type: "application/json" });
+
     const { data, error } = await client.storage
       .from(PERSONAS_BUCKET)
-      .upload(filePath, personaJson, {
+      .upload(filePath, blob, {
         contentType: "application/json",
         upsert: false,
       });
