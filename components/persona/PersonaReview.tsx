@@ -96,7 +96,7 @@ export function PersonaReview({
           )}
 
           {/* Traits */}
-          {persona.traits && persona.traits.length > 0 && (
+          {Array.isArray(persona.traits) && persona.traits.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Personality Traits</h3>
               <div className="flex flex-wrap gap-2">
@@ -110,7 +110,7 @@ export function PersonaReview({
           )}
 
           {/* Interests */}
-          {persona.interests && persona.interests.length > 0 && (
+          {Array.isArray(persona.interests) && persona.interests.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Interests</h3>
               <div className="flex flex-wrap gap-2">
@@ -124,7 +124,7 @@ export function PersonaReview({
           )}
 
           {/* Skills */}
-          {persona.skills && persona.skills.length > 0 && (
+          {Array.isArray(persona.skills) && persona.skills.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Skills</h3>
               <div className="flex flex-wrap gap-2">
@@ -136,7 +136,7 @@ export function PersonaReview({
           )}
 
           {/* Values */}
-          {persona.values && persona.values.length > 0 && (
+          {Array.isArray(persona.values) && persona.values.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Core Values</h3>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
@@ -168,7 +168,7 @@ export function PersonaReview({
           )}
 
           {/* Goals */}
-          {persona.goals && persona.goals.length > 0 && (
+          {Array.isArray(persona.goals) && persona.goals.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Goals</h3>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
@@ -180,7 +180,7 @@ export function PersonaReview({
           )}
 
           {/* Challenges */}
-          {persona.challenges && persona.challenges.length > 0 && (
+          {Array.isArray(persona.challenges) && persona.challenges.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">Challenges</h3>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
