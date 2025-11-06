@@ -4,13 +4,31 @@
  * Provides request/response handling, error catching, CORS, and logging
  */
 
-import { Handler } from "@netlify/functions";
+import { Handler, HandlerEvent, HandlerContext as NetlifyHandlerContext } from "@netlify/functions";
 import { AppError, toAppError } from "./errors";
 import { logger } from "./logger";
 
 export interface HandlerContext {
   functionName: string;
   startTime: number;
+}
+
+/**
+ * Convert Netlify HandlerEvent to Web API Request
+ */
+function eventToRequest(event: HandlerEvent): Request {
+  const method = event.httpMethod || "GET";
+  const path = event.path || "/";
+  const queryString = event.rawQuery ? `?${event.rawQuery}` : "";
+  const url = new URL(`https://example.com${path}${queryString}`);
+
+  const headers = new Headers(event.headers || {});
+
+  return new Request(url.toString(), {
+    method,
+    headers,
+    body: event.body ? event.body : undefined,
+  });
 }
 
 /**
@@ -83,7 +101,10 @@ export function createHandler(
     context?: any
   ) => Promise<Response> | Response
 ): Handler {
-  return async (request, context) => {
+  return async (event, context) => {
+    // Convert Netlify HandlerEvent to Request
+    const request = eventToRequest(event);
+
     const functionName = context?.functionName || "unknown";
     const startTime = Date.now();
 
