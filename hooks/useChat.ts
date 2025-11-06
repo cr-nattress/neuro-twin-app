@@ -26,6 +26,7 @@
 import { useState, useCallback } from "react";
 import { ChatMessage, ChatRequest, ChatResponse } from "@/types/persona";
 import { getApiBaseUrl } from "@/lib/api";
+import { createApiLogger } from "@/lib/api-logger";
 
 /**
  * Return type for useChat hook.
@@ -65,7 +66,15 @@ export function useChat(personaId: string | null): UseChatReturn {
 
   const sendMessage = useCallback(
     async (content: string): Promise<boolean> => {
-      if (!personaId || !content.trim()) return false;
+      const logger = createApiLogger("sendMessage", "/.netlify/functions/chat");
+
+      if (!personaId || !content.trim()) {
+        logger.logStep("Message validation failed", {
+          hasPersonaId: !!personaId,
+          hasContent: !!content.trim(),
+        });
+        return false;
+      }
 
       // Create user message
       const userMessage: ChatMessage = {
@@ -74,6 +83,11 @@ export function useChat(personaId: string | null): UseChatReturn {
         content: content.trim(),
         timestamp: new Date().toISOString(),
       };
+
+      logger.logStep("Adding user message to state", {
+        messageId: userMessage.id,
+        messageLength: content.length,
+      });
 
       // Add user message to state
       setMessages((prev) => [...prev, userMessage]);
@@ -88,23 +102,79 @@ export function useChat(personaId: string | null): UseChatReturn {
           history: messages.slice(-10), // Send last 10 messages for context
         };
 
+        logger.logStep("Prepared chat request", {
+          messageLength: request.message.length,
+          historyLength: request.history?.length || 0,
+          hasConversationId: !!conversationId,
+        });
+
         // Call chat API
         const baseUrl = getApiBaseUrl();
-        const response = await fetch(`${baseUrl}/.netlify/functions/chat`, {
+        const url = `${baseUrl}/.netlify/functions/chat`;
+
+        logger.logRequest({
+          url,
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: request,
+          timestamp: new Date().toISOString(),
+        });
+
+        logger.logStep("Sending chat request to Netlify function");
+
+        const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(request),
         });
 
+        logger.logStep("Chat API response received", {
+          status: response.status,
+          statusText: response.statusText,
+        });
+
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          logger.logStep("Response not OK, attempting to parse error");
+          let errorData: any = {};
+          try {
+            errorData = await response.json();
+          } catch (parseError) {
+            logger.logStep("Could not parse error response as JSON");
+          }
+
+          const error = new Error(
+            errorData.error || `HTTP ${response.status}: ${response.statusText}`
+          );
+          logger.logError(error);
+
+          throw error;
         }
 
+        logger.logStep("Parsing response JSON");
         const data: ChatResponse = await response.json();
 
+        logger.logResponse({
+          status: response.status,
+          statusText: response.statusText,
+          body: {
+            success: data.success,
+            responseLength: data.response?.length,
+            hasConversationId: !!data.conversation_id,
+          },
+          duration: 0,
+          timestamp: new Date().toISOString(),
+        });
+
         if (data.success && data.response) {
+          logger.logStep("Chat response successful", {
+            responseLength: data.response.length,
+          });
+
           // Store conversation ID if provided
           if (data.conversation_id) {
+            logger.logStep("Updating conversation ID", {
+              conversationId: data.conversation_id,
+            });
             setConversationId(data.conversation_id);
           }
 
@@ -117,14 +187,28 @@ export function useChat(personaId: string | null): UseChatReturn {
             metadata: data.metadata,
           };
 
+          logger.logStep("Adding agent message to state", {
+            messageId: agentMessage.id,
+            messageLength: data.response.length,
+          });
+
           // Add agent message to state
           setMessages((prev) => [...prev, agentMessage]);
+
+          logger.logStep("Chat message exchange completed successfully");
           return true;
         } else {
-          throw new Error(data.error || "Failed to get response");
+          const error = new Error(data.error || "Failed to get response");
+          logger.logError(error);
+          throw error;
         }
-      } catch (error: any) {
-        console.error("Chat error:", error);
+      } catch (error: unknown) {
+        logger.logError(error);
+
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
+        logger.logStep("Chat failed", { errorMessage });
+
         return false;
       } finally {
         setIsTyping(false);

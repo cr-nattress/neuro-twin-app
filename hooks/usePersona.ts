@@ -29,6 +29,7 @@
 import { useState, useEffect } from "react";
 import { Persona } from "@/types/persona";
 import { personaService } from "@/services/serviceFactory";
+import { createApiLogger } from "@/lib/api-logger";
 
 /**
  * Return type for usePersona hook.
@@ -61,26 +62,46 @@ export function usePersona(personaId: string | null): UsePersonaReturn {
   const [error, setError] = useState<string | null>(null);
 
   const fetchPersona = async () => {
+    const logger = createApiLogger("usePersona", "/.netlify/functions/get-persona");
+
     if (!personaId) {
+      logger.logStep("No personaId provided, skipping fetch");
       setLoading(false);
       return;
     }
 
+    logger.logStep("Starting persona fetch", { personaId });
     setLoading(true);
     setError(null);
 
     try {
+      logger.logStep("Calling personaService.getPersona");
       const response = await personaService.getPersona(personaId);
 
+      logger.logStep("Received response from personaService", {
+        success: response.success,
+        hasPersona: !!response.persona,
+        hasError: !!response.error,
+      });
+
       if (response.success && response.persona) {
+        logger.logStep("Persona fetched successfully", {
+          personaName: response.persona.name,
+        });
         setPersona(response.persona);
       } else {
-        setError(response.error || "Failed to load persona");
+        const errorMessage = response.error || "Failed to load persona";
+        logger.logStep("Persona fetch failed", { error: errorMessage });
+        setError(errorMessage);
       }
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred");
+      logger.logError(err);
+      const errorMessage = err.message || "An unexpected error occurred";
+      logger.logStep("usePersona catch error", { errorMessage });
+      setError(errorMessage);
     } finally {
       setLoading(false);
+      logger.logStep("usePersona fetch completed");
     }
   };
 
