@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "nodenext",
+    "types": ["@netlify/functions"],
+    "esModuleInterop": true
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["node_modules"]
+}

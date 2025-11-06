@@ -1,14 +1,51 @@
 /**
- * Get Persona Function
- * Retrieves a persona from Supabase blob storage by ID
+ * @module netlify/functions/get-persona
  *
- * GET /.netlify/functions/get-persona?persona_id=persona_abc123...
+ * Netlify Function endpoint that retrieves a saved persona from Supabase blob storage.
  *
- * Response:
+ * @context
+ * - Called by frontend when loading a previously saved persona for chat or review
+ * - Validates persona ID format, retrieves JSON from storage, returns structured data
+ * - Used by chat function to load persona context for responses
+ *
+ * @endpoint GET /.netlify/functions/get-persona?persona_id=persona_abc123...
+ *
+ * @dependencies
+ * - ./lib/base-handler: Request/response utilities
+ * - ./lib/supabase: Persona storage retrieval
+ * - ./lib/validation: Persona ID format validation
+ * - ./lib/errors: Custom error classes
+ * - ./lib/logger: Structured logging
+ *
+ * @sideeffects
+ * - Downloads persona JSON blob from Supabase Storage
+ * - Logs retrieval operation
+ *
+ * @example Request
+ * ```
+ * GET /.netlify/functions/get-persona?persona_id=persona_abc123def456gh
+ * ```
+ *
+ * @example Response (success)
+ * ```json
  * {
  *   "success": true,
- *   "persona": { ...persona object... }
+ *   "persona": {
+ *     "name": "John Doe",
+ *     "occupation": "Software Engineer",
+ *     "traits": ["analytical", "detail-oriented"],
+ *     "metadata": {"created_at": "2024-01-01T00:00:00Z"}
+ *   }
  * }
+ * ```
+ *
+ * @example Response (not found)
+ * ```json
+ * {
+ *   "success": false,
+ *   "error": "Persona not found: persona_abc123def456gh"
+ * }
+ * ```
  */
 
 import { Handler } from "@netlify/functions";
@@ -29,7 +66,13 @@ interface GetPersonaResponse {
 }
 
 /**
- * Handle get-persona requests
+ * Handles persona retrieval requests.
+ *
+ * @param {Request} request - Web API Request object with persona_id query parameter
+ * @returns {Promise<Response>} JSON response with persona object or error
+ * @throws {ValidationError} If persona_id is missing or invalid format
+ * @throws {NotFoundError} If persona doesn't exist in storage
+ * @throws {SupabaseError} If storage download fails (caught by createHandler)
  */
 async function handleGetPersona(request: Request): Promise<Response> {
   logger.info("get-persona function called");

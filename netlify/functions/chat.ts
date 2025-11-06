@@ -1,27 +1,55 @@
 /**
- * Chat Function
- * Handles chat messages and returns agent responses
+ * @module netlify/functions/chat
  *
- * Currently returns mock responses. Will integrate with multi-agent backend in EPIC-06.
+ * Netlify Function endpoint that handles chat conversations with a persona.
  *
- * POST /.netlify/functions/chat
+ * @context
+ * - Called by frontend when user sends a message in chat interface
+ * - Currently returns mock responses based on message content and persona context
+ * - Will integrate with multi-agent backend in future epic (EPIC-06)
+ * - Loads persona for context but continues if persona unavailable
  *
- * Request body:
+ * @endpoint POST /.netlify/functions/chat
+ *
+ * @dependencies
+ * - ./lib/base-handler: Request/response utilities
+ * - ./lib/validation: Chat input validation
+ * - ./lib/supabase: Persona retrieval for context
+ * - ./lib/logger: Structured logging
+ * - nanoid: Generates conversation and message IDs
+ *
+ * @sideeffects
+ * - Retrieves persona from Supabase for context (optional)
+ * - Logs chat interaction
+ * - Generates mock responses based on input patterns
+ *
+ * @example Request
+ * ```json
  * {
- *   "message": "user message text",
- *   "persona_id": "persona_...",
- *   "conversation_id": "conv_...",  // optional
- *   "history": [...]                // optional recent messages
+ *   "message": "Tell me about yourself",
+ *   "persona_id": "persona_abc123def456gh",
+ *   "conversation_id": "conv_xyz789",
+ *   "history": [
+ *     {"role": "user", "content": "Hi"},
+ *     {"role": "agent", "content": "Hello! How can I help?"}
+ *   ]
  * }
+ * ```
  *
- * Response:
+ * @example Response (success)
+ * ```json
  * {
  *   "success": true,
- *   "response": "agent response text",
- *   "conversation_id": "conv_...",
- *   "message_id": "msg_...",
- *   "metadata": { "tokens_used": 150, "processing_time_ms": 1200 }
+ *   "response": "That's a great question! Based on my background and experience...",
+ *   "conversation_id": "conv_xyz789",
+ *   "message_id": "msg_1699000000000_abc123de",
+ *   "metadata": {
+ *     "tokens_used": 150,
+ *     "processing_time_ms": 125,
+ *     "agents_involved": ["MockAgent"]
+ *   }
  * }
+ * ```
  */
 
 import { Handler } from "@netlify/functions";
@@ -49,7 +77,14 @@ interface ChatResponse {
 }
 
 /**
- * Mock responses that vary based on input
+ * Generates mock response based on message content and persona context.
+ *
+ * @param {string} message - User message to respond to
+ * @param {string} [personaName] - Optional persona name to personalize response
+ * @returns {string} Mock agent response
+ *
+ * @decision Categorizes messages (greeting/question/default) and returns contextual responses
+ * with randomized additions to simulate natural variation
  */
 function generateMockResponse(message: string, personaName?: string): string {
   const responses: Record<string, string[]> = {
@@ -96,7 +131,11 @@ function generateMockResponse(message: string, personaName?: string): string {
 }
 
 /**
- * Handle chat requests
+ * Handles chat message requests.
+ *
+ * @param {Request} request - Web API Request object with chat message payload
+ * @returns {Promise<Response>} JSON response with agent response and metadata
+ * @throws {ValidationError} If input validation fails (caught by createHandler)
  */
 async function handleChat(request: Request): Promise<Response> {
   logger.info("chat function called");

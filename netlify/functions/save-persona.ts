@@ -1,20 +1,46 @@
 /**
- * Save Persona Function
- * Saves a persona to Supabase blob storage
+ * @module netlify/functions/save-persona
  *
- * POST /.netlify/functions/save-persona
+ * Netlify Function endpoint that saves a structured persona to Supabase blob storage.
  *
- * Request body:
+ * @context
+ * - Called by frontend after user reviews and approves extracted persona
+ * - Generates unique persona ID and uploads JSON to Supabase
+ * - Returns persona_id for referencing in chat and retrieval operations
+ *
+ * @endpoint POST /.netlify/functions/save-persona
+ *
+ * @dependencies
+ * - ./lib/base-handler: Request/response utilities
+ * - ./lib/supabase: Persona storage operations
+ * - ./lib/validation: Input validation schemas
+ * - ./lib/logger: Structured logging
+ *
+ * @sideeffects
+ * - Uploads persona JSON blob to Supabase Storage
+ * - Generates unique persona ID (persona_[nanoid])
+ * - Logs save operation
+ *
+ * @example Request
+ * ```json
  * {
- *   "persona": { ...persona object... }
+ *   "persona": {
+ *     "name": "John Doe",
+ *     "occupation": "Software Engineer",
+ *     "traits": ["analytical", "detail-oriented"],
+ *     "metadata": {"created_at": "2024-01-01T00:00:00Z"}
+ *   }
  * }
+ * ```
  *
- * Response:
+ * @example Response (success)
+ * ```json
  * {
  *   "success": true,
- *   "persona_id": "persona_abc123...",
- *   "storage_path": "persona_abc123....json"
+ *   "persona_id": "persona_abc123def456gh",
+ *   "storage_path": "persona_abc123def456gh.json"
  * }
+ * ```
  */
 
 import { Handler } from "@netlify/functions";
@@ -35,7 +61,12 @@ interface SavePersonaResponse {
 }
 
 /**
- * Handle save-persona requests
+ * Handles persona save requests.
+ *
+ * @param {Request} request - Web API Request object
+ * @returns {Promise<Response>} JSON response with persona_id or error
+ * @throws {ValidationError} If input validation fails (caught by createHandler)
+ * @throws {SupabaseError} If storage upload fails (caught by createHandler)
  */
 async function handleSavePersona(request: Request): Promise<Response> {
   logger.info("save-persona function called");

@@ -158,7 +158,7 @@ export function errorResponse(error: AppError) {
  * Converts a Web API Response back to Netlify's expected format.
  *
  * @param {Response} response - Web API Response object
- * @returns {Promise<HandlerResponse>} Netlify-compatible response object
+ * @returns {Promise<{statusCode: number, body: string, headers: Record<string, string>}>} Netlify-compatible response object
  */
 async function responseToHandlerResponse(response: Response) {
   const body = await response.text();

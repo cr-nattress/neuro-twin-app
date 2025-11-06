@@ -184,7 +184,7 @@ export async function extractPersona(input: PersonaExtractionInput): Promise<Per
       }
       result = JSON.parse(jsonMatch[0]);
     } catch (parseError) {
-      logger.error("Failed to parse OpenAI response as JSON", { content });
+      logger.error("Failed to parse OpenAI response as JSON", parseError, { content });
       throw new OpenAIError("Failed to parse persona data from OpenAI response");
     }
 
